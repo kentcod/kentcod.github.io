@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kent Codding - Interactive Portfolio</title>
+    <!-- Leaflet.js CSS from CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-main: #c9d1d9;
+            --text-bright: #f0f6fc;
+            --accent-teal: #58a6ff;
+            --border-color: #30363d;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 525px 1fr; /* Sidebar width matching user layout constraint */
+            gap: 20px;
+            max-width: 1300px;
+            width: 100%;
+        }
+        .sidebar {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 24px 24px 0 24px; /* Flush bottom padding for full map integration */
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        .main-content {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 24px;
+        }
+        /* Project Cards */
+        .project-card {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .project-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-teal);
+        }
+        .project-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .project-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-bright);
+        }
+        .project-icon {
+            color: var(--accent-teal);
+            flex-shrink: 0;
+        }
+        /* Details Drawer (Right-Side) */
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: -500px;
+            width: 480px; /* Fitting canvases beautifully with padding */
+            height: 100%;
+            background-color: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 30px 20px;
+            box-sizing: border-box;
+            z-index: 1000; /* Layers over map tiles cleanly */
+            overflow-y: auto;
+        }
+        .drawer.open {
+            right: 0;
+        }
+        
+        /* Left-Side Drawer (Education details) */
+        .drawer-left {
+            position: fixed;
+            top: 0;
+            left: -500px;
+            width: 450px;
+            height: 100%;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 30px;
+            box-sizing: border-box;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .drawer-left.open {
+            left: 0;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            cursor: pointer;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+        .close-btn:hover {
+            color: var(--accent-teal);
+        }
+        
+        /* Education Cards */
+        .education-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-primary);
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .education-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-teal);
+        }
+        
+        /* Metric Table Styling */
+        .metric-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+        .metric-table th, .metric-table td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .metric-table th {
+            color: var(--text-bright);
+            border-bottom: 2px solid var(--border-color);
+            font-weight: 600;
+        }
+        .metric-table td.label {
+            font-weight: bold;
+            color: var(--accent-teal);
+            width: 35%;
+        }
+        /* Leaflet Popups Style Overrides */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background-color: var(--bg-secondary) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+            border-radius: 4px;
+        }
+        .leaflet-popup-content {
+            margin: 12px 16px !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;
+            line-height: 1.4;
+        }
+        .leaflet-container a.leaflet-popup-close-button {
+            color: var(--text-main) !important;
+            padding: 8px 8px 0 0 !important;
+        }
+        .leaflet-container a.leaflet-popup-close-button:hover {
+            color: var(--accent-teal) !important;
+        }
+        /* Pipeline Tab Buttons */
+        .sim-btn {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-bright);
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        .sim-btn:hover {
+            border-color: var(--accent-teal);
+            color: var(--accent-teal);
+        }
+        .sim-btn.active {
+            background-color: var(--accent-teal);
+            border-color: var(--accent-teal);
+            color: var(--bg-primary);
+        }
+        /* Sub-simulator styling block */
+        .novelty-section {
+            margin-top: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            background-color: var(--bg-primary);
+        }
+        .novelty-section-title {
+            margin-top: 0;
+            margin-bottom: 8px;
+            color: var(--text-bright);
+            font-size: 1rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar Column -->
+        <div class="sidebar">
+            <h2 style="color: var(--text-bright); margin-top: 0;">Kent Codding</h2>
+            <p style="color: var(--accent-teal); font-weight: bold; margin-bottom: 5px;">Data Scientist</p>
+            <p style="margin-top: 0; font-size: 14px;">SMART Scholarship for Service at DTRA</p>
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+
+            <!-- DTRA SMART Scholar Mission Card -->
+            <!-- <div class="education-card" onclick="showDetails('dtra-analyst')" style="margin-bottom: 20px; border: 1px solid #800080;">
+                <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+                    <rect x="5" y="15" width="90" height="70" rx="8" fill="#800080" stroke="#ffffff" stroke-width="2"/>
+                    <text x="50" y="58" fill="#ffffff" font-family="'Georgia', serif" font-weight="bold" font-size="20" text-anchor="middle">DTRA</text>
+                </svg>
+                <div>
+                    <strong style="margin: 0; color: var(--text-bright); font-size: 14px; display: block;">SMART Scholar Mission Support</strong>
+                    <span style="margin: 2px 0; font-size: 11px; color: #85e89d; font-family: monospace; font-weight: bold; letter-spacing: 0.5px; display: block;">UNCLASS / PUBLIC RELEASE</span>
+                    <span style="margin: 0; font-size: 11px; color: var(--accent-teal); font-weight: bold; display: block;">Click to view anomaly detection & trade risk briefs →</span>
+                </div>
+            </div> -->
+            
+            <h3 style="margin-top: 0; margin-bottom: 12px;">Education</h3>
+            <!-- Harvard University Card -->
+            <div class="education-card" onclick="showLeftDetails('harvard-edu')" style="margin-bottom: 12px;">
+                <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+                    <path d="M12 20C12 20 12 75 50 88C88 75 88 20 88 20L50 12L12 20Z" fill="#A51C30" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="50" y="62" fill="#FFFFFF" font-family="'Georgia', serif" font-weight="bold" font-size="42" text-anchor="middle">H</text>
+                </svg>
+                <div>
+                    <h4 style="margin: 0; color: var(--text-bright); font-size: 14px;">Harvard University</h4>
+                    <p style="margin: 0; font-size: 12px; color: var(--accent-teal); font-weight: bold;">M.S. in Data Science</p>
+                </div>
+            </div>
+            
+            <!-- William & Mary Card -->
+            <div class="education-card" onclick="showLeftDetails('wm-edu')" style="margin-bottom: 24px; display: flex; flex-direction: column; align-items: stretch; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <!-- Localized William & Mary JPG Asset Slot -->
+                    <div style="width: 40px; height: 40px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); flex-shrink: 0; background-color: var(--bg-primary);">
+                        <img src="assets/images/CollegeofWilliamandMary.png" alt="William & Mary Logo" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; color: var(--text-bright); font-size: 14px;">William & Mary</h4>
+                        <p style="margin: 0; font-size: 12px; color: var(--accent-teal); font-weight: bold;">B.S. in Biology</p>
+                    </div>
+                </div>
+                <!-- ##HYPERLINK: Campus757 Photo Citation Link -->
+                <!-- <div style="font-size: 10px; color: var(--text-main); text-align: right; font-style: italic; border-top: 1px solid var(--border-color); padding-top: 6px;" onclick="event.stopPropagation();">
+                    Image source: <a href="https://campus757.com/universities/the-college-of-william-and-mary/" target="_blank" style="color: var(--accent-teal); text-decoration: underline;">Campus757</a>
+                </div> -->
+            </div>
+
+
+            <!-- Double-Sized Flush Map Area -->
+            <div id="map" style="flex-grow: 1; min-height: 480px; width: calc(100% + 48px); margin-left: -24px; margin-right: -24px; border-radius: 0 0 6px 6px; border: none; border-top: 1px solid var(--border-color); background-color: var(--bg-primary); z-index: 1;"></div>
+        </div>
+        
+        <!-- Main Workspace Column -->
+        <div class="main-content">
+            <h2 style="color: var(--text-bright); margin-top: 0;">Experience & Projects</h2>
+            <p style="font-style: italic; font-size: 14px; margin-bottom: 20px;">
+                Click any card to learn more
+            </p>
+            
+            <!-- Antibiotic Discovery Card -->
+            <div class="project-card" onclick="showDetails('drug-discovery')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- Six-sided chemical ring -->
+                        <polygon points="12 2 20 6.5 20 15.5 12 20 4 15.5 4 6.5" />
+                        <!-- Inner double bonds for aromatic stability -->
+                        <line x1="12" y1="5.5" x2="18.5" y2="9.25" />
+
+                        <!-- External atomic radical extensions -->
+                        <line x1="20" y1="6.5" x2="23" y2="4.5" />
+                        <line x1="4" y1="15.5" x2="1" y2="17.5" />
+                    </svg>
+
+                    <h3>Generative AI for Antibiotic Discovery</h3>
+                </div>
+                <!-- ##HYPERLINK: Primary-level link-outs to ATOMICA Codebase & Paper -->
+                <div style="margin-top: 8px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                    <a href="https://github.com/EmilioVenegas/ATOMICA-Diffusion-Antibiotic-design" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">GitHub</a>
+                    <span style="color: var(--border-color);"></span>
+                    <a href="https://drive.google.com/file/d/1yhGPRHdkfrMFoCFCP6PrD66y2eTM-CPv/view?usp=drive_link" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">Paper</a>
+                    <span style="color: var(--border-color);"></span>
+                    <a href="https://www.youtube.com/playlist?list=PLypiXJdtIca4gtioEPLIExlAKvu64z7rc" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">Full Course (2024)</a>
+                </div>
+
+
+            </div>
+            
+            <!-- Agentic RAG Card -->
+            <div class="project-card" onclick="showDetails('rag-pipeline')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                    </svg>
+                    <h3>Client-Facing LLM</h3>
+                </div>
+                <!-- ##HYPERLINK: Link-out to Capstone PDF directly from primary page -->
+                <div style="margin-top: 8px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                    <a href="https://drive.google.com/file/d/1dGiqqk0IUyndFNdzn0FFf44xcOpbQx_l/view?usp=sharing" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">Paper</a>
+                    <span style="color: var(--border-color);"></span>
+                    <a href="https://wyss.harvard.edu/technology/wurq/" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">WurQ</a>
+
+                </div>
+            </div>
+
+
+            <!-- DTRA Analyst Card -->
+            <div class="project-card" onclick="showDetails('dtra-analyst')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <h3>Operations Research</h3>
+                </div>
+                <!-- ##HYPERLINK: Link-out to official DTRA portal -->
+                <div style="margin-top: 8px; font-size: 11px;">
+                    <a href="https://www.dtra.mil/" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">DTRA</a>
+                </div>
+            </div>
+            
+            <!-- IHD Spatial Card -->
+            <div class="project-card" onclick="showDetails('ihd-modeling')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <h3>Epidemiology Research</h3>
+                </div>
+                <!-- ##HYPERLINK: Primary-level link-out to ArcGIS StoryMap -->
+                <div style="margin-top: 8px; font-size: 11px;">
+                    <a href="https://arcg.is/0KCbje" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">StoryMap</a>
+                </div>
+            </div>
+
+            <!-- NEW CARD: Oncology Biomarker Discovery -->
+            <div class="project-card" onclick="showDetails('biomarker-discovery')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- Grid frame boundaries -->
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <!-- Matrix grid lines -->
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                        <line x1="15" y1="3" x2="15" y2="21" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="3" y1="15" x2="21" y2="15" />
+                        <!-- Active/High-expression Biomarker nodes (Statistical Outliers) -->
+                        <circle cx="6" cy="6" r="2" fill="currentColor" />
+                        <circle cx="12" cy="12" r="2" fill="currentColor" />
+                        <circle cx="18" cy="18" r="2" fill="currentColor" />
+                    </svg>
+
+                    <h3>Oncology Biomarker Discovery</h3>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                    <a href="https://github.com/kentcod/Harvard-STAT117" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">GitHub</a>
+                    <span style="color: var(--border-color);"></span>
+                    <a href="https://hsph.harvard.edu/profile/giovanni-parmigiani/" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">Course Instructor</a>
+                </div>
+
+            </div>
+
+            <!-- Monroe Highland Lead Card -->
+            <div class="project-card" onclick="showDetails('highland-restoration')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <h3>Invasive Species Modeling</h3>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px;">
+                    <a href="https://github.com/kentcod/Highland-Code" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold; position: relative; z-index: 10;" onclick="event.stopPropagation();">GitHub</a>
+                </div>
+            </div>
+
+            <div class="project-card" onclick="showDetails('reston-gis')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    <h3>Invasive Species Mapping</h3>
+                </div>
+            </div>
+
+            <!-- NCAA Swimming Card -->
+            <div class="project-card" onclick="showDetails('wm-swimming')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Top Wave -->
+                    <path d="M3 7C5 5.5 7 5.5 9 7C11 8.5 13 8.5 15 7C17 5.5 19 5.5 21 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <!-- Middle Wave -->
+                    <path d="M3 12C5 10.5 7 10.5 9 12C11 13.5 13 13.5 15 12C17 10.5 19 10.5 21 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.75"/>
+                    <!-- Bottom Wave -->
+                    <path d="M3 17C5 15.5 7 15.5 9 17C11 18.5 13 18.5 15 17C17 15.5 19 15.5 21 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+                    </svg>
+
+
+                    <h3>NCAA Division I Team Captain</h3>
+                </div>
+            </div>
+
+            <!-- Head Swim Coach Card -->
+            <!--
+            <div class="project-card" onclick="showDetails('cch-coaching')">
+                <div class="project-header">
+                    <svg class="project-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 7C5 5.5 7 5.5 9 7C11 8.5 13 8.5 15 7C17 5.5 19 5.5 21 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M3 12C5 10.5 7 10.5 9 12C11 13.5 13 13.5 15 12C17 10.5 19 10.5 21 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.75"/>
+                        <path d="M3 17C5 15.5 7 15.5 9 17C11 18.5 13 18.5 15 17C17 15.5 19 15.5 21 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+                    </svg>
+
+                    <h3>Head Swim Coach</h3>
+                </div>
+            </div>
+            -->
+        </div>
+    </div>
+    
+    <!-- Right-Side Details Drawer -->
+    <div id="detailDrawer" class="drawer">
+        <button class="close-btn" onclick="closeDrawer()" aria-label="Close drawer">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <h2 id="drawerTitle" style="color: var(--text-bright); margin-top: 40px; font-size: 1.5rem;">Project Title</h2>
+        <div id="drawerBody" style="margin-top: 20px; line-height: 1.6;">
+            ABOUT - PLANT ...
+        </div>
+    </div>
+    
+    <!-- Left-Side Details Drawer -->
+    <div id="leftDetailDrawer" class="drawer-left">
+        <button class="close-btn" onclick="closeLeftDrawer()" aria-label="Close left drawer">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <h2 id="leftDrawerTitle" style="color: var(--text-bright); margin-top: 40px; font-size: 1.5rem;">Education Details</h2>
+        <div id="leftDrawerBody" style="margin-top: 20px; line-height: 1.6;">
+            Details go here...
+        </div>
+    </div>
+
+    <!-- Leaflet JS from CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        // High-Density Portfolio Data Engine
+        const PORTFOLIO_DATA = {
+            'biomarker-discovery': {
+                title: 'Harvard University - Oncology Biomarker Discovery',
+                content: `
+                    <div style="border-left: 3px solid #A51C30; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Oncology Biomarker Discovery</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">Dana-Farber Cancer Institute / Harvard Coursework</span>
+                    </div>
+                    <table class="metric-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Value / Method</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- ##HYPERLINK -->
+                            <tr>
+                                <td class="label">Project Files</td>
+                                <td>
+                                    <a href="https://github.com/kentcod/Harvard-STAT117" target="_blank" style="color: var(--accent-teal); text-decoration: underline; font-weight: bold;">GitHub Repository</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="label">Core Algorithm</td>
+                                <td>Bayesian Markov Chain Monte Carlo (MCMC)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Static n << p Transcriptomics Visual inside Right Sidebar -->
+                    <div class="novelty-section">
+                        <div class="novelty-section-title">The High-Dimensional Bottleneck (n ≪ p)</div>
+                        <p style="font-size: 12px; margin-top: 0; color: var(--text-main); line-height: 1.45;">
+                            <strong>Definitions:</strong> A <u>microarray</u> extracts a patient's active <u>transcriptome</u> (thousands of active gene expression levels) from a tumor sample simultaneously.
+                        </p>
+                        
+                        <!-- Wide-Matrix CSS Representation -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px; margin-top: 15px;">
+                            <div style="text-align: center; font-size: 10px; color: var(--accent-teal); font-family: monospace;">
+                                ◀— — — Many Genes (Predictors) measured — — —▶
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="writing-mode: vertical-lr; transform: rotate(180deg); font-size: 9px; color: #85e89d; font-family: monospace; text-align: center; line-height: 1;">
+                                    Few patients (n)
+                                </div>
+                                <div style="flex-grow: 1; height: 32px; border: 1px solid var(--border-color); background: repeating-linear-gradient(90deg, rgba(88,166,255,0.06), rgba(88,166,255,0.06) 6px, transparent 6px, transparent 15px); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--text-main); font-family: monospace; letter-spacing: 0.5px;">
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Localized Microarray Image Slot -->
+                        <div style="border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); background-color: var(--bg-primary); margin-bottom: 6px; margin-top: 15px;">
+                            <img src="assets/images/microarray.webp" alt="Dana-Farber Cancer Institute Microarray Expression Matrix" style="width: 100%; height: auto; display: block; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                        </div>
+
+                        <!-- ##HYPERLINK: Roll Barresi Design Citation Link -->
+                        <div style="font-size: 10px; color: var(--text-main); text-align: right; font-style: italic; margin-bottom: 5px;">
+                            Image source: <a href="https://www.rollbarresi.com/work/dana-farber-cancer-institute" target="_blank" style="color: var(--accent-teal); text-decoration: underline;">Roll Barresi • Dana-Farber Cancer Institute</a>
+                        </div>
+                    </div>
+
+
+                    <p style="font-size: 13px; color: var(--text-main); margin-top: 15px;">
+                        <strong>Summary:</strong> Applied Bayesian Markov Chain Monte Carlo (MCMC) methods to high-dimensional clinical transcriptomic arrays. Identified genomic signaling patterns and regulatory profiles correlating to clinical treatment response rates, validating potential oncology biomarkers.
+                    </p>
+                `
+            },
+
+
+            'harvard-edu': {
+                title: 'Harvard University',
+                content: `
+                    <div style="border-left: 3px solid #A51C30; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Master of Science in Data Science</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">December 2025 • GPA: 3.89 / 4.0</span>
+                    </div>
+                    
+                    <table class="metric-table">
+                        <thead>
+                            <tr>
+                                <th>University</th>
+                                <th>Coursework</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="label">Harvard</td>
+                                <td>Advanced Data Science A & B, Linear Models, Spatial GIS Computational Mathematics, Modern Biostatistics, Data Ethics</td>
+                            </tr>
+
+                            <tr>
+                                <td class="label">MIT</td>
+                                <td>ML for Computational Biology, The Analytics Edge</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="border-left: 3px solid #800080; padding-left: 15px; margin-top: 25px; margin-bottom: 10px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Funded by SMART</strong><br>
+                        <span style="font-size: 13px; line-height: 1.5;">
+                            Sponsored via the <a href="https://www.smartscholarship.org/smart" target="_blank" rel="noopener noreferrer" style="color: var(--accent-teal); font-weight: bold; text-decoration: underline;">SMART Scholarship for Service Program</a>.
+                        </span>
+                    </div>
+                `
+            },
+            'wm-edu': {
+                title: 'College of William & Mary',
+                content: `
+                    <div style="border-left: 3px solid #115740; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Bachelor of Science in Biology</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">Received May 2024 • GPA: 3.95 / 4.0</span>
+                    </div>
+                    
+                    <p style="font-size: 13px; color: var(--text-main); margin: 0; line-height: 1.4;">
+                        Coursework: Applied ML, Advanced Biostatistics, Quantitative Biology, TA for Intro Biostats, Calculus I-III, Linear Algebra, Organic Chemistry I-II, Molecular Genetics, Environmental Science, Ecology, Environmental Justice, and Conservation
+                    </p>
+
+
+                `
+            },
+            'drug-discovery': {
+                title: 'Generative AI for Antibiotic Discovery',
+                content: `
+                    <p>Generated high-affinity antibiotic candidates matching bacterial protein pockets using 3D structural embeddings.</p>
+                    
+                    <table class="metric-table">
+                        <tbody>
+                            <tr>
+                                <td class="label">Docking Engine</td>
+                                <td>AutoDock Vina (In-silico Verification)</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Output Delta</td>
+                                <td>Generated compounds outperformed random baselines by 45%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                                    
+                    <!-- Novelty Area 1 -->
+                    <div class="novelty-section">
+                        <div class="novelty-section-title">1) Atom-level Graph Construction</div>
+                        <p style="font-size: 12px; margin-top: 0; color: var(--text-main);">
+                            Resolves the protein pocket at atomic resolution, constructing local spatial KNN graphs with virtual global nodes to encode context.
+                        </p>
+                        <div style="display: flex; gap: 5px; margin-bottom: 12px;">
+                            <button id="btnStep1" class="sim-btn active" onclick="switchSection1('step1')">1. Graph Extraction</button>
+                            <button id="btnStep2" class="sim-btn" onclick="switchSection1('step2')">2. GNN Convolutions</button>
+                        </div>
+                        
+                        <canvas id="graphCanvas" width="390" height="180" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; display: block; margin: 0 auto;"></canvas>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 11px; font-family: monospace; line-height: 1.4;">
+                            <div><span style="color: var(--accent-teal); font-weight: bold; text-transform: uppercase;">[Input]:</span> <span id="graphInput" style="color: var(--text-bright);">Biopython residue objects (Atom 3D coordinates)</span></div>
+                            <div style="margin-top: 4px;"><span style="color: var(--accent-teal); font-weight: bold; text-transform: uppercase;">[Output]:</span> <span id="graphOutput" style="color: var(--text-bright);">Topological Graph G = (Vertices,Edges)</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Novelty Area 2 -->
+                    <div class="novelty-section">
+                        <div class="novelty-section-title">2) Cross-Attention Conditioning on Pocket</div>
+                        <p style="font-size: 12px; margin-top: 0; color: var(--text-main);">
+                            Forces the ligand generation process to dynamically attend to the deep, pre-learned geometric and chemical interaction fields encoded by ATOMICA.
+                        </p>
+                        
+                        <canvas id="attentionCanvas" width="390" height="180" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; display: block; margin: 0 auto;"></canvas>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 11px; font-family: monospace; line-height: 1.4;">
+                            <div><span style="color: var(--accent-teal); font-weight: bold; text-transform: uppercase;">[Keys & Values (H_p)]:</span> <span style="color: var(--text-bright);">ATOMICA Pocket Embeddings</span></div>
+                            <div style="margin-top: 4px;"><span style="color: var(--accent-teal); font-weight: bold; text-transform: uppercase;">[Queries (H_L)]:</span> <span style="color: var(--text-bright);">Intermediate Ligand Features from diffusion</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Novelty Area 3 -->
+                    <div class="novelty-section">
+                        <div class="novelty-section-title">3) ADMET Filtering and 3 Forward Passes</div>
+                        <p style="font-size: 12px; margin-top: 0; color: var(--text-main);">
+                            An evolutionary recycling loop optimizing generated compounds across 3 sequential, selective forward passes.
+                        </p>
+                        <div style="display: flex; gap: 5px; margin-bottom: 12px;">
+                            <button id="btnPass1" class="sim-btn active" onclick="switchSection3('pass1')">Pass 1</button>
+                            <button id="btnPass2" class="sim-btn" onclick="switchSection3('pass2')">Pass 2</button>
+                            <button id="btnPass3" class="sim-btn" onclick="switchSection3('pass3')">Pass 3</button>
+                        </div>
+                        
+                        <canvas id="filterCanvas" width="390" height="180" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; display: block; margin: 0 auto;"></canvas>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 11px; font-family: monospace; line-height: 1.4;">
+                            <div><span style="color: var(--accent-teal); font-weight: bold; text-transform: uppercase;">[Stage]:</span> <span id="passStageName" style="color: var(--text-bright);">Iteration 1 (500 Molecules)</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Scientific Figures Section (Figure 2 Vertically Stacked to Canvas Scale) -->
+                    <div class="novelty-section">
+                        <div class="novelty-section-title">Figure 2: Structural Docking Alignments</div>
+                        <p style="font-size: 12px; margin-top: 0; color: var(--text-main); margin-bottom: 20px;">
+                            High-resolution structural panels detailing pocket coordinates, generation, and target superimpositions.
+                        </p>
+                        
+                        <!-- Panel A -->
+                        <div style="margin-bottom: 25px;">
+                            <strong style="color: var(--text-bright); font-size: 11px; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;"></strong>
+                            <div style="width: 386.0px; height: 216px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                                <img src="assets/images/MLCB_Fig1A.png" alt="Figure 2A: Cavity Contours" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                            </div>
+                            <p style="font-size: 11px; color: var(--text-main); margin: 0; line-height: 1.4;">
+                                <strong>Figure 2A:</strong> 
+                                [LEFT] Examples of generated molecules by the AtomDiffRL pipeline. Molecules showed proper valence of atoms, valid geometry, aromaticity, angles, bond distances, without clashes as well as valid functional groups. [RIGHT] shows the target protein receptor (penicillin-binding protein 3 of P. aeruginosa) pocket shape.
+                            </p>
+                        </div>
+
+
+                    </div>
+                `
+            },
+
+
+
+            'rag-pipeline': {
+                title: 'Harvard Capstone: WurQ Client-Facing Workout LLM',
+                content: `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                        <div style="border-left: 3px solid #800080; padding-left: 10px;">
+                            <strong style="color: var(--text-bright); font-size: 12px; text-transform: uppercase; font-family: monospace;">Problem</strong>
+                            <p style="margin: 5px 0 0 0; font-size: 12px; line-height: 1.4; color: var(--text-main);">
+                                WurQ required a client-facing LLM with secure knowledge of users' multi-session wearable workout sensor history.
+                            </p>
+                        </div>
+                        <div style="border-left: 3px solid var(--accent-teal); padding-left: 10px;">
+                            <strong style="color: var(--text-bright); font-size: 12px; text-transform: uppercase; font-family: monospace;">Solution</strong>
+                            <p style="margin: 5px 0 0 0; font-size: 12px; line-height: 1.4; color: var(--text-main);">
+                                A Workout session memory globalization system that enables
+historical querying through selective retrieval, fetching only the data relevant to
+each user query. Our approach combines hierarchical multi-agent orchestration with
+hybrid retrieval-augmented generation (RAG), achieving 95% context reduction
+while maintaining high SQL accuracy, safety, and interpretability.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <table class="metric-table">
+                        <tbody>
+                            <!-- ##HYPERLINK -->
+                            
+                            <tr>
+                                <td class="label">Tech Stack</td>
+                                <td>LangGraph, Vector Index, Hybrid Search (Dense + Sparse)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <!-- Panel A -->
+                        <div style="margin-bottom: 25px;">
+                            <div style="width: 400px; height: 225px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                                <img src="assets/images/WurQ-System-01313_Final.avif" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                            </div>
+                            <p style="font-size: 11px; color: var(--text-main); margin: 0; line-height: 1.4;">
+                                <strong>Above</strong>: WurQ's waistband captures sensor data including but not limited to rep speed, exercise type, and range of motion. Our LLM answered users' questions about descriptive statistics from previous workouts.
+                            </p>
+                        </div>
+
+                `
+            },
+
+            'dtra-analyst': {
+                title: 'DTRA - Operations Research',
+                content: `
+                    <div style="border-left: 3px solid #800080; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Operations Research Analyst (GS-12)</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">June 2025-Present</span>
+                    </div>
+                    <div style="background-color: var(--bg-tertiary); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: 15px; font-size: 11px; color: #85e89d; font-family: monospace; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">
+                        Classification: UNCLASSIFIED / PUBLIC RELEASE
+                    </div>
+                    
+                    </table>
+                    <p style="font-size: 13px; color: var(--text-main);">
+                        Develop and translate ML models into actionable insights for both technical and non-technical senior-level officials to support DTRA’s CBRN (Chemical, Biological, Radiological, and Nuclear) defense efforts 
+                    </p>
+                    <div style="width: 430px; height: 537px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                        <img src="assets/images/Kent H Codding Civ J358 Official Portrait 01.JPG" alt="Figure 2B: Candidate Alignment" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                    </div>
+                `
+            },
+            'highland-restoration': {
+                title: 'W&M / Monroe Highland - Invasive Species Predictive Modeling',
+                content: `
+                    <div style="border-left: 3px solid #115740; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Research Project Lead</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">Jan-Dec 2023</span>
+                    </div>
+                    
+                    </table>
+                    <p style="font-size: 13px; color: var(--text-main);">
+                        Led a multifunctional team mapping invasive plants at James Monroe Highland (Fig 1). 
+                        Unsurveyable Polygons were predicted using Supervised Learning to predict invasive plant cover by polygon (overall_in) in Legend. (Fig 2). Surveyed Polygons indicated by persistent ID labels from 1-2.
+                    
+                        </p>
+
+                    <div style="margin-bottom: 25px;">
+                            <div style="width: 1050px; height: 636px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                                <img src="assets/images/Layout Compartment Invasion.jpg" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                            </div>
+                        </div>
+
+                    <div style="margin-bottom: 25px;">
+                            <div style="width: 1050px; height: 811px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                                <img src="assets/images/Layout Compartment ML.jpg" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                            </div>
+                        </div>
+                `
+            },
+            'ihd-modeling': {
+                title: 'Harvard / WHO - Ischemic Heart Disease Spatial Modeling',
+                content: `
+                    <div style="border-left: 3px solid #A51C30; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Epidemiology Researcher</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">Oct 2024 - May 2025</span>
+                    </div>
+                    <table class="metric-table">
+                        <tbody>
+                            <tr>
+                                <td class="label">Scope</td>
+                                <td>European Nations 1983-2022</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Variables</td>
+                                <td>30 continuous rates per 100k across Environmental, Socioeconomic, & Healthcare </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p style="font-size: 13px; color: var(--text-main);">
+                        Led the GIS portion of five Harvard graduate-level researchers investigating IHD mortality rates in Europe using extensive WHO data. Uncovered strong correlation dynamics, linking spatially autocorrelated countries and healthcare budgets to mortality rates.
+                    </p>
+                        <div style="margin-bottom: 25px;">
+                            <div style="width: 430px; height: 550px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                                <img src="assets/images/Decades_IHD2010s.jpg" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                            </div>
+                        </div>
+                        <p style="font-size: 13px; color: var(--text-main);">
+                                Ischemic Heart Disease Deaths per 100k citizens averaged over 2010-2019 for all study countries split into 5 quintiles
+                            </p>
+                `
+            },
+            'erg-epa-justice': {
+                title: 'Eastern Research Group - EPA Steam Plant Assessments',
+                content: `
+                    <div style="border-left: 3px solid var(--accent-teal); padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Environmental Data Analyst</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">May-Aug 2023</span>
+                    </div>
+                    <table class="metric-table">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Database / Tech Stack</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="label">R Modeling</td>
+                                <td>Custom cleaning pipelines & R package builds</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Datasets</td>
+                                <td>National Hydrography Dataset, American Census Survey</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p style="font-size: 13px; color: var(--text-main);">
+                        Built robust automated pipelines assessing coal-fired steam plant exceeding indices. Enabled localized socio-demographic correlation testing, speeding up Environmental Justice assessments for EPA consideration.
+                    </p>
+                `
+            },
+            'wm-swimming': {
+                title: 'Tribe Swimming',
+                content: `
+                    <div style="border-left: 3px solid #115740; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">W&M</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">Aug 2020 - March 2024</span>
+                    </div>
+                    
+                    <p style="font-size: 13px; color: var(--text-main);">
+                        Elected by peers as Team Captain. 
+                    </p>
+                    <div style="width: 547.2px; height: 331px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                        <img src="assets/images/IMG_8666_Crop.JPG" alt="Figure 2A: Cavity Contours" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                    </div>
+                    <div style="width: 547.2px; height: 364.8px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                        <img src="assets/images/IMG_8650.JPG" alt="Figure 2A: Cavity Contours" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                    </div>  
+                `
+            },
+            'reston-gis': {
+                title: 'Reston Association - Invasive Plants',
+                content: `
+                    <div style="border-left: 3px solid #58a6ff; padding-left: 15px; margin-bottom: 20px;">
+                        <strong style="color: var(--text-bright); font-size: 1.1rem;">Researcher</strong><br>
+                        <span style="color: var(--accent-teal); font-weight: bold;">May-Aug 2022</span>
+                    </div>
+                    </table>
+                    <p style="font-size: 13px; color: var(--text-main);">
+                        Conducted field surveying to map Virginia invasive flora land cover. Delivered report to Reston Association to recommend invasive plant removal according to Virginia DCR standards
+                    </p>
+                    <!-- Panel A -->
+                    <div style="margin-bottom: 25px;">
+                        <strong style="color: var(--text-bright); font-size: 11px; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;"></strong>
+                        <div style="width: 403.2px; height: 302.4px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin: 0 auto 10px auto; background: var(--bg-primary); display: flex; align-items: center; justify-content: center;">
+                            <img src="assets/images/IMG_8069.jpeg" alt="Figure 2A: Cavity Contours" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.85; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-main); margin: 0; line-height: 1.4;">
+                            <strong>GMU partner and mentor identifying Oriental Bittersweet.</strong> 
+                        </p>
+                    <p style="margin-bottom: 10px;"></p><p></p>
+
+                        <p style="font-size: 13px; color: var(--text-main); margin: 0; line-height: 1.4;">
+                            Proprietary maps are not shown but informed invasive plant patterns along stream vectors for parameter selection the following summer at Highland. Both research sites divided invasive polygon cover into 5 classes: 0-5%, 5-25%, 25-50%, 50-75%, and 75-100% cover.
+                        </p>
+                    </div>
+                `
+            },
+            // 'cch-coaching': {
+            //     title: 'Country Club Hills',
+            //     content: `
+            //         <div style="border-left: 3px solid var(--accent-teal); padding-left: 15px; margin-bottom: 20px;">
+            //             <strong style="color: var(--text-bright); font-size: 1.1rem;">Head Swimming Coach</strong><br>
+            //             <span style="color: var(--accent-teal); font-weight: bold;">Summers 2021 & 2022</span>
+            //         </div>
+            //         <table class="metric-table">
+            //             <thead>
+            //                 <tr>
+            //                     <td class="label">Coaching Range</td>
+            //                     <td>180+ youth swimmers (ages 4-18) from rudimentary water safety to regional champions</td>
+            //                 </tr>
+            //             </tbody>
+            //         </table>
+                    
+            //     `
+            // }
+        };
+
+        // Drawer Navigation Logic (Left & Right Sidebars)
+        let graphInterval = null;
+        let attentionInterval = null;
+        let filterInterval = null;
+        let activeSection1Step = 'step1';
+        let activeSection3Pass = 'pass1';
+
+        function showDetails(key) {
+            const data = PORTFOLIO_DATA[key];
+            if (!data) return;
+            document.getElementById('drawerTitle').innerHTML = data.title;
+            document.getElementById('drawerBody').innerHTML = data.content;
+            document.getElementById('detailDrawer').classList.add('open');
+            // Initialize multi-simulator rendering if opening MIT Drug Discovery
+            if (key === 'drug-discovery' && document.getElementById('graphCanvas')) {
+                startAllSimulations();
+            } else {
+                cleanupSimulation();
+            }
+        }
+        function closeDrawer() {
+            document.getElementById('detailDrawer').classList.remove('open');
+            cleanupSimulation();
+        }
+        function showLeftDetails(key) {
+            const data = PORTFOLIO_DATA[key];
+            if (!data) return;
+            document.getElementById('leftDrawerTitle').innerHTML = data.title;
+            document.getElementById('leftDrawerBody').innerHTML = data.content;
+            document.getElementById('leftDetailDrawer').classList.add('open');
+        }
+        function closeLeftDrawer() {
+            document.getElementById('leftDetailDrawer').classList.remove('open');
+        }
+        function cleanupSimulation() {
+            if (graphInterval) { clearInterval(graphInterval); graphInterval = null; }
+            if (attentionInterval) { clearInterval(attentionInterval); attentionInterval = null; }
+            if (filterInterval) { clearInterval(filterInterval); filterInterval = null; }
+        }
+        function startAllSimulations() {
+            cleanupSimulation();
+            switchSection1('step1');
+            startCrossAttentionSimulation();
+            switchSection3('pass1');
+        }
+
+        // Section 1 Switcher
+        function switchSection1(type) {
+            activeSection1Step = type;
+            const buttons = ['btnStep1', 'btnStep2'];
+            buttons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById('btn' + type.charAt(0).toUpperCase() + type.slice(1));
+            if (activeBtn) activeBtn.classList.add('active');
+            const graphInputEl = document.getElementById('graphInput');
+            const graphOutputEl = document.getElementById('graphOutput');
+            if (type === 'step1') {
+                if (graphInputEl) graphInputEl.textContent = 'Biopython residue objects (Atom 3D coordinates)';
+                if (graphOutputEl) graphOutputEl.textContent = 'Topological Graph G = (V,E)';
+                startAtomEmbeddingSimulation();
+            } else if (type === 'step2') {
+                if (graphInputEl) graphInputEl.textContent = 'Topological Graph G = (V,E)';
+                if (graphOutputEl) graphOutputEl.textContent = 'Equivariant GNN Embeddings (unit_repr)';
+                startGNNConvolutionsSimulation();
+            }
+        }
+
+        // Section 3 Switcher
+        function switchSection3(pass) {
+            activeSection3Pass = pass;
+            const buttons = ['btnPass1', 'btnPass2', 'btnPass3'];
+            buttons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById('btn' + pass.charAt(0).toUpperCase() + pass.slice(1));
+            if (activeBtn) activeBtn.classList.add('active');
+            const stageEl = document.getElementById('passStageName');
+            const filterEl = document.getElementById('passFilterDetails');
+            if (pass === 'pass1') {
+                if (stageEl) stageEl.textContent = 'Iteration 1 (500 Molecules generated from AtomDiff)';
+            } else if (pass === 'pass2') {
+                if (stageEl) stageEl.textContent = 'Iteration 2 (100 Molecules generated per top 5 candidate = 500 total)';
+            } else if (pass === 'pass3') {
+                if (stageEl) stageEl.textContent = 'Iteration 3 (Third & Final Forward Pass = 500 total)';
+            }
+            startRLOptimizationSimulation();
+        }
+
+        // --- PIPELINE MODULE ANIMATIONS ---
+
+        // NOVELTY 1, STEP 1: ATOMICA Preprocessing (Graph Extraction KNN)
+        function startAtomEmbeddingSimulation() {
+            if (graphInterval) clearInterval(graphInterval);
+            const canvas = document.getElementById('graphCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const pocketPoints = [
+                { x: 80, y: 60, type: 'C', color: '#8a949e' },
+                { x: 160, y: 50, type: 'O', color: '#ff7b72' },
+                { x: 240, y: 70, type: 'N', color: '#58a6ff' },
+                { x: 280, y: 130, type: 'C', color: '#8a949e' },
+                { x: 180, y: 150, type: 'O', color: '#ff7b72' },
+                { x: 100, y: 120, type: 'C', color: '#8a949e' }
+            ];
+            const knnBonds = [
+                { i: 0, j: 5, dist: 67 },
+                { i: 5, j: 4, dist: 85 },
+                { i: 4, j: 3, dist: 101 },
+                { i: 3, j: 2, dist: 72 },
+                { i: 2, j: 1, dist: 82 },
+                { i: 1, j: 0, dist: 80 }
+            ];
+            let frame = 0;
+            const maxFrames = 150;
+            graphInterval = setInterval(() => {
+                if (activeSection1Step !== 'step1') return;
+                ctx.clearRect(0, 0, width, height);
+                // Grid background
+                ctx.strokeStyle = 'rgba(48, 54, 61, 0.2)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < width; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+                }
+                for (let i = 0; i < height; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+                }
+                const progress = Math.min(1, frame / 110);
+                const scanRadius = progress * 130;
+                
+                // Scanning wavefront circles
+                if (progress < 1) {
+                    pocketPoints.forEach((p) => {
+                        ctx.strokeStyle = `rgba(88, 166, 255, ${0.15 * (1 - progress)})`;
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, scanRadius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    });
+                }
+                // KNN Edges
+                knnBonds.forEach((bond) => {
+                    const p1 = pocketPoints[bond.i];
+                    const p2 = pocketPoints[bond.j];
+                    
+                    if (scanRadius >= bond.dist) {
+                        const edgeProgress = Math.min(1, (scanRadius - bond.dist) / 30);
+                        ctx.strokeStyle = `rgba(88, 166, 255, ${edgeProgress * 0.75})`;
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                });
+                // Nodes
+                pocketPoints.forEach((p) => {
+                    ctx.fillStyle = 'rgba(13, 17, 23, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 8px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(p.type, p.x, p.y);
+                    ctx.fillStyle = '#8a949e';
+                    ctx.font = '9px monospace';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${p.type}: [${p.x}, ${p.y}]`, p.x + 12, p.y + 3);
+                });
+                // HUD Panel
+                ctx.fillStyle = 'rgba(240, 246, 252, 0.85)';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`1) POCKET GRAPH EXTRACTION`, 15, 12);
+                let statusText = "STATUS: SCANNING KNN 3D COORDINATES...";
+                let statusColor = "#58a6ff";
+                if (progress >= 1) {
+                    statusText = "STATUS: TOPOLOGICAL GRAPH CONSTRUCTED";
+                    statusColor = "#56d364";
+                }
+                ctx.fillStyle = statusColor;
+                ctx.fillText(statusText, 15, 25);
+                frame += 1;
+                if (frame > maxFrames) {
+                    frame = 0;
+                }
+            }, 20);
+        }
+
+        // NOVELTY 1, STEP 2: e3nn GNN Convolutions
+        function startGNNConvolutionsSimulation() {
+            if (graphInterval) clearInterval(graphInterval);
+            const canvas = document.getElementById('graphCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const pocketPoints = [
+                { x: 80, y: 60, type: 'C', color: '#8a949e', ripple: 0 },   // 0
+                { x: 160, y: 50, type: 'O', color: '#ff7b72', ripple: 0 },  // 1
+                { x: 240, y: 70, type: 'N', color: '#58a6ff', ripple: 0 },  // 2
+                { x: 280, y: 130, type: 'C', color: '#8a949e', ripple: 0 }, // 3
+                { x: 180, y: 150, type: 'O', color: '#ff7b72', ripple: 0 }, // 4
+                { x: 100, y: 120, type: 'C', color: '#8a949e', ripple: 0 }  // 5
+            ];
+            const vNode = { x: 173, y: 97, ripple: 0 };
+            const knnBonds = [
+                { i: 0, j: 5 }, { i: 5, j: 4 }, { i: 4, j: 3 },
+                { i: 3, j: 2 }, { i: 2, j: 1 }, { i: 1, j: 0 }
+            ];
+            let frame = 0;
+            const maxFrames = 180;
+            graphInterval = setInterval(() => {
+                if (activeSection1Step !== 'step2') return;
+                ctx.clearRect(0, 0, width, height);
+                // Grid background
+                ctx.strokeStyle = 'rgba(48, 54, 61, 0.2)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < width; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+                }
+                for (let i = 0; i < height; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+                }
+                // Global hierarchical links
+                ctx.strokeStyle = 'rgba(188, 140, 255, 0.1)';
+                ctx.setLineDash([2, 4]);
+                pocketPoints.forEach(p => {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(vNode.x, vNode.y);
+                    ctx.stroke();
+                });
+                ctx.setLineDash([]);
+                // Local GNN communication lines
+                ctx.strokeStyle = 'rgba(88, 166, 255, 0.15)';
+                ctx.lineWidth = 1.5;
+                knnBonds.forEach(bond => {
+                    const p1 = pocketPoints[bond.i];
+                    const p2 = pocketPoints[bond.j];
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                });
+                const hop1Active = frame >= 0 && frame < 40;
+                const hop2Active = frame >= 40 && frame < 80;
+                const hop3Active = frame >= 80 && frame < 120;
+                const initialSize = 6;
+                const decay1 = initialSize * (2 / 3);
+                const decay2 = decay1 * (2 / 3);
+                if (frame === 40) {
+                    pocketPoints[3].ripple = 25; 
+                    pocketPoints[5].ripple = 25; 
+                }
+                if (frame === 60) {
+                    vNode.ripple = 35; 
+                }
+                if (frame === 80) {
+                    pocketPoints[2].ripple = 25; 
+                    pocketPoints[0].ripple = 25; 
+                }
+                if (frame === 120) {
+                    pocketPoints[1].ripple = 25; 
+                }
+                if (hop1Active) {
+                    const t = frame / 40;
+                    const p4 = pocketPoints[4];
+                    const p5 = pocketPoints[5];
+                    const p3 = pocketPoints[3];
+                    const xL = p4.x + (p5.x - p4.x) * t;
+                    const yL = p4.y + (p5.y - p4.y) * t;
+                    ctx.fillStyle = '#58a6ff';
+                    ctx.beginPath(); ctx.arc(xL, yL, initialSize, 0, Math.PI * 2); ctx.fill();
+                    const xR = p4.x + (p3.x - p4.x) * t;
+                    const yR = p4.y + (p3.y - p4.y) * t;
+                    ctx.beginPath(); ctx.arc(xR, yR, initialSize, 0, Math.PI * 2); ctx.fill();
+                    const xG = p4.x + (vNode.x - p4.x) * (frame / 60);
+                    const yG = p4.y + (vNode.y - p4.y) * (frame / 60);
+                    ctx.fillStyle = '#bc8cff';
+                    ctx.beginPath(); ctx.arc(xG, yG, 4, 0, Math.PI * 2); ctx.fill();
+                }
+                if (hop2Active) {
+                    const t = (frame - 40) / 40;
+                    const p5 = pocketPoints[5];
+                    const p0 = pocketPoints[0];
+                    const p3 = pocketPoints[3];
+                    const p2 = pocketPoints[2];
+                    const xL = p5.x + (p0.x - p5.x) * t;
+                    const yL = p5.y + (p0.y - p5.y) * t;
+                    ctx.fillStyle = '#58a6ff';
+                    ctx.beginPath(); ctx.arc(xL, yL, decay1, 0, Math.PI * 2); ctx.fill();
+                    const xR = p3.x + (p2.x - p3.x) * t;
+                    const yR = p3.y + (p2.y - p3.y) * t;
+                    ctx.beginPath(); ctx.arc(xR, yR, decay1, 0, Math.PI * 2); ctx.fill();
+                    if (frame < 60) {
+                        const p4 = pocketPoints[4];
+                        const xG = p4.x + (vNode.x - p4.x) * (frame / 60);
+                        const yG = p4.y + (vNode.y - p4.y) * (frame / 60);
+                        ctx.fillStyle = '#bc8cff';
+                        ctx.beginPath(); ctx.arc(xG, yG, 4, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+                if (hop3Active) {
+                    const t = (frame - 80) / 40;
+                    const p0 = pocketPoints[0];
+                    const p1 = pocketPoints[1];
+                    const p2 = pocketPoints[2];
+                    const xL = p0.x + (p1.x - p0.x) * t;
+                    const yL = p0.y + (p1.y - p0.y) * t;
+                    ctx.fillStyle = '#58a6ff';
+                    ctx.beginPath(); ctx.arc(xL, yL, decay2, 0, Math.PI * 2); ctx.fill();
+                    const xR = p2.x + (p1.x - p2.x) * t;
+                    const yR = p2.y + (p1.y - p2.y) * t;
+                    ctx.fillStyle = '#58a6ff';
+                    ctx.beginPath(); ctx.arc(xR, yR, decay2, 0, Math.PI * 2); ctx.fill();
+                }
+                pocketPoints.forEach((p, idx) => {
+                    if (p.ripple > 0) {
+                        ctx.strokeStyle = `rgba(88, 166, 255, ${p.ripple / 25})`;
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath(); ctx.arc(p.x, p.y, 25 - p.ripple, 0, Math.PI * 2); ctx.stroke();
+                        p.ripple -= 1;
+                    }
+                    if (idx === 4) {
+                        ctx.strokeStyle = 'rgb(255, 123, 114)';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2); ctx.stroke();
+                    }
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 8px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(p.type, p.x, p.y);
+                });
+                if (vNode.ripple > 0) {
+                    ctx.strokeStyle = `rgba(188, 140, 255, ${vNode.ripple / 35})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(vNode.x, vNode.y, 35 - vNode.ripple, 0, Math.PI * 2); ctx.stroke();
+                    vNode.ripple -= 1;
+                }
+                ctx.fillStyle = '#bc8cff';
+                ctx.beginPath(); ctx.arc(vNode.x, vNode.y, 6, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 8px sans-serif';
+                ctx.fillText('vg', vNode.x, vNode.y);
+                ctx.fillStyle = 'rgba(240, 246, 252, 0.85)';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.fillText("2) HIERARCHICAL GNN CONVOLUTIONS", 15, 12);
+                let statusMsg = "STATUS: MESSAGE PASSING STEP 1";
+                let statusColor = "#58a6ff";
+                if (hop2Active) statusMsg = "STATUS: STEP 2";
+                else if (hop3Active) statusMsg = "STATUS: STEP 3";
+                else if (frame >= 120) {
+                    statusMsg = "STATUS: CONVOLUTION STEP COMPLETED";
+                    statusColor = "#56d364";
+                }
+                ctx.fillStyle = statusColor;
+                ctx.fillText(statusMsg, 15, 25);
+                frame += 1;
+                if (frame > maxFrames) {
+                    frame = 0;
+                }
+            }, 30);
+        }
+
+        // NOVELTY 2: Cross-Attention Conditioning Animation
+        function startCrossAttentionSimulation() {
+            if (attentionInterval) clearInterval(attentionInterval);
+            const canvas = document.getElementById('attentionCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            // 1. Static Pocket Nodes (Hp)
+            const pocketNodes = [
+                { x: 80, y: 60, type: 'C', color: '#58a6ff' },   // Node 0
+                { x: 160, y: 50, type: 'O', color: '#58a6ff' },  // Node 1
+                { x: 240, y: 70, type: 'N', color: '#58a6ff' },  // Node 2
+                { x: 280, y: 130, type: 'C', color: '#58a6ff' }, // Node 3
+                { x: 180, y: 150, type: 'O', color: '#58a6ff' }, // Node 4
+                { x: 100, y: 120, type: 'C', color: '#58a6ff' }  // Node 5
+            ];
+            const pocketBonds = [
+                { i: 0, j: 5 }, { i: 5, j: 4 }, { i: 4, j: 3 },
+                { i: 3, j: 2 }, { i: 2, j: 1 }, { i: 1, j: 0 }
+            ];
+            // 2. Muted surrounding protein backbone structure
+            const backboneNodes = [
+                { x: 30, y: 35 }, { x: 110, y: 25 }, { x: 200, y: 20 }, { x: 320, y: 80 },
+                { x: 310, y: 165 }, { x: 230, y: 175 }, { x: 140, y: 170 }, { x: 40, y: 135 }
+            ];
+            const backboneBonds = [
+                { from: backboneNodes[0], to: pocketNodes[0] },
+                { from: backboneNodes[1], to: pocketNodes[1] },
+                { from: backboneNodes[2], to: pocketNodes[2] },
+                { from: pocketNodes[3], to: backboneNodes[3] },
+                { from: pocketNodes[3], to: backboneNodes[4] },
+                { from: pocketNodes[4], to: backboneNodes[5] },
+                { from: pocketNodes[5], to: backboneNodes[6] },
+                { from: pocketNodes[5], to: backboneNodes[7] },
+                { from: backboneNodes[7], to: backboneNodes[0] }
+            ];
+            // 3. Red-to-Green mutating cyclic ligand ring
+            const ligandAtomTypes = ['C', 'N', 'C', 'O', 'C'];
+            const ringRadius = 22;
+            
+            let ddimStep = 0;
+            const maxSteps = 100;
+            let holdFrames = 0;
+            const maxHoldFrames = 45; 
+            let driftAngle = 0;
+            attentionInterval = setInterval(() => {
+                ctx.clearRect(0, 0, width, height);
+                // Grid background
+                ctx.strokeStyle = 'rgba(48, 54, 61, 0.2)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < width; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+                }
+                for (let i = 0; i < height; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+                }
+                // Reverse Diffusion calculations
+                let isComplete = (ddimStep === maxSteps);
+                let currentLoss = 0.85;
+                if (ddimStep < maxSteps) {
+                    ddimStep++;
+                    currentLoss = (0.835 * Math.pow(0.95, ddimStep) + 0.015).toFixed(4);
+                } else {
+                    isComplete = true;
+                    currentLoss = "0.0150";
+                    holdFrames++;
+                    if (holdFrames > maxHoldFrames) {
+                        ddimStep = 0;
+                        holdFrames = 0;
+                    }
+                }
+                const ligandColorHex = isComplete ? '#56d364' : '#ff7b72';
+                const ligandColorRgb = isComplete ? '86, 211, 100' : '255, 123, 114';
+                driftAngle += 0.025;
+                const ligandCenterX = 330 + Math.sin(driftAngle) * 5;
+                const ligandCenterY = 110 + Math.cos(driftAngle * 1.1) * 4;
+                const ligandNodes = ligandAtomTypes.map((type, idx) => {
+                    const angle = idx * (2 * Math.PI / 5) + (driftAngle * 0.12);
+                    return {
+                        x: ligandCenterX + Math.cos(angle) * ringRadius,
+                        y: ligandCenterY + Math.sin(angle) * ringRadius,
+                        type: type
+                    };
+                });
+                // Draw grey backbone links
+                ctx.strokeStyle = 'rgba(138, 148, 158, 0.15)';
+                ctx.lineWidth = 2;
+                backboneBonds.forEach(bond => {
+                    ctx.beginPath(); ctx.moveTo(bond.from.x, bond.from.y); ctx.lineTo(bond.to.x, bond.to.y); ctx.stroke();
+                });
+                backboneNodes.forEach(node => {
+                    ctx.fillStyle = '#21262d';
+                    ctx.strokeStyle = '#30363d';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.arc(node.x, node.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                });
+                // Draw static active pocket
+                ctx.strokeStyle = 'rgba(88, 166, 255, 0.25)';
+                ctx.lineWidth = 3;
+                pocketBonds.forEach(bond => {
+                    const p1 = pocketNodes[bond.i];
+                    const p2 = pocketNodes[bond.j];
+                    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+                });
+                pocketNodes.forEach(p => {
+                    ctx.fillStyle = 'rgba(13, 17, 23, 0.85)';
+                    ctx.strokeStyle = '#58a6ff';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 8px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(p.type, p.x, p.y);
+                });
+                // Draw ligand bonds
+                ctx.strokeStyle = `rgba(${ligandColorRgb}, 0.5)`;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                for (let i = 0; i < ligandNodes.length; i++) {
+                    const nextIdx = (i + 1) % ligandNodes.length;
+                    ctx.moveTo(ligandNodes[i].x, ligandNodes[i].y);
+                    ctx.lineTo(ligandNodes[nextIdx].x, ligandNodes[nextIdx].y);
+                }
+                ctx.stroke();
+                ligandNodes.forEach(l => {
+                    ctx.fillStyle = 'rgba(13, 17, 23, 0.85)';
+                    ctx.strokeStyle = ligandColorHex;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(l.x, l.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 8px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(l.type, l.x, l.y);
+                });
+                // Draw attention links
+                pocketNodes.forEach((pNode, pIdx) => {
+                    ligandNodes.forEach((lNode, lIdx) => {
+                        const dx = lNode.x - pNode.x;
+                        const dy = lNode.y - pNode.y;
+                        const baseWeight = isComplete ? 0.9 : (0.35 + 0.65 * Math.sin(ddimStep * 0.05 + pIdx * 1.5 + lIdx * 2.2));
+                        
+                        if (baseWeight > 0.4) {
+                            ctx.strokeStyle = isComplete 
+                                ? `rgba(86, 211, 100, ${baseWeight * 0.2})` 
+                                : `rgba(88, 166, 255, ${baseWeight * 0.25})`;
+                            ctx.lineWidth = 0.5 + baseWeight * 1.5;
+                            ctx.beginPath(); ctx.moveTo(pNode.x, pNode.y); ctx.lineTo(lNode.x, lNode.y); ctx.stroke();
+                            const travelSpeed = isComplete ? 0.003 : 0.012;
+                            const offset = (ddimStep * travelSpeed + pIdx * 0.2 + lIdx * 0.4) % 1;
+                            const traceX = pNode.x + dx * offset;
+                            const traceY = pNode.y + dy * offset;
+                            
+                            ctx.fillStyle = isComplete ? `rgba(86, 211, 100, 0.8)` : `rgba(188, 140, 255, 0.8)`;
+                            ctx.beginPath(); ctx.arc(traceX, traceY, 2, 0, Math.PI * 2); ctx.fill();
+                        }
+                    });
+                });
+                // HUD labels
+                ctx.fillStyle = 'rgba(240, 246, 252, 0.85)';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText("3) EQUIVARIANT CROSS-ATTENTION MAPS", 15, 12);
+                const statusMsg = isComplete 
+                    ? "STATUS: CONVERGED | LIGAND STRUCTURAL ALIGNMENT OPTIMIZED" 
+                    : "STATUS: SAMPLING MOLECULAR POSES... (ATTENTION FIELD ACTIVE)";
+                
+                ctx.fillStyle = isComplete ? '#56d364' : '#58a6ff';
+                ctx.fillText(statusMsg, 15, 25);
+                ctx.fillStyle = '#8a949e';
+                ctx.fillText(`DDIM TIMESTEP: ${ddimStep}/${maxSteps}  |  LOSS: ${currentLoss}`, 15, 40);
+            }, 30);
+        }
+
+        // NOVELTY 3: ADMET Filtering and 3 Forward Passes Animation
+        // ==========================================
+        // VERSION 2: MULTI-ATOMIC RING STRUCTURES
+        // ==========================================
+                // ==========================================
+        // VERSION 2 (ITERATED): CYCLOHEXANE RINGS
+        // ==========================================
+                function startRLOptimizationSimulation() {
+            if (filterInterval) clearInterval(filterInterval);
+            const canvas = document.getElementById('filterCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            const generateComplexMolecules = (pass) => {
+                const list = [];
+                let centerMW, centerTox, spreadMW, spreadTox;
+                if (pass === 'pass1') {
+                    centerMW = 380; centerTox = 0.55; spreadMW = 110; spreadTox = 0.25;
+                } else if (pass === 'pass2') {
+                    centerMW = 310; centerTox = 0.32; spreadMW = 70; spreadTox = 0.18;
+                } else {
+                    centerMW = 265; centerTox = 0.12; spreadMW = 45; spreadTox = 0.08;
+                }
+                
+                // Generate 10 structurally unique cyclohexane compounds
+                for (let i = 0; i < 10; i++) {
+                    const hash1 = (Math.sin(i * 45.123 + 99.12) * 1000) % 1;
+                    const hash2 = (Math.cos(i * 12.834 + 14.92) * 1000) % 1;
+                    const mw = centerMW + hash1 * 2 * spreadMW - spreadMW;
+                    const tox = centerTox + hash2 * 2 * spreadTox - spreadTox;
+                    
+                    const clampedMW = Math.max(160, Math.min(580, mw));
+                    const clampedTox = Math.max(0.02, Math.min(0.95, tox));
+                    
+                    let passesREOS = true;
+                    if (pass === 'pass1') passesREOS = (clampedTox < 0.72 && clampedMW < 520);
+                    else if (pass === 'pass2') passesREOS = (clampedTox < 0.60);
+                    else passesREOS = (clampedTox < 0.40);
+                    
+                    list.push({
+                        mw: clampedMW,
+                        tox: clampedTox,
+                        passes: passesREOS,
+                        seed: i
+                    });
+                }
+                return list;
+            };
+
+            let molecules = generateComplexMolecules(activeSection3Pass);
+            let frame = 0;
+            const plotX = 45;
+            const plotY = 35;
+            const plotW = 320;
+            const plotH = 125;
+            const getX = (mw) => plotX + ((mw - 150) / 450) * plotW;
+            const getY = (tox) => plotY + (1 - tox) * plotH;
+
+            // Sort molecules by priority/passes so we can isolate the top 5
+            const sortedMolecules = [...molecules].sort((a, b) => b.passes - a.passes || a.tox - b.tox);
+            const top5Ids = sortedMolecules.slice(0, 5).map(m => m.seed);
+
+            filterInterval = setInterval(() => {
+                ctx.clearRect(0, 0, width, height);
+                // Grid background
+                ctx.strokeStyle = 'rgba(48, 54, 61, 0.2)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < width; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+                }
+                for (let i = 0; i < height; i += 20) {
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+                }
+                // Plot outline
+                ctx.strokeStyle = '#30363d';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(plotX, plotY, plotW, plotH);
+                
+                // Axis values
+                ctx.fillStyle = '#8a949e';
+                ctx.font = '7.5px monospace';
+                ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                ctx.fillText("Tox: 1.0", plotX - 5, plotY);
+                ctx.fillText("Tox: 0.5", plotX - 5, plotY + plotH/2);
+                ctx.fillText("Tox: 0.0", plotX - 5, plotY + plotH);
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.fillText("MW: 150 Da", plotX, plotY + plotH + 5);
+                ctx.fillText("350 Da", plotX + plotW * (200/450), plotY + plotH + 5);
+                ctx.fillText("500 Da (Lipinski Limit)", plotX + plotW * (350/450), plotY + plotH + 5);
+                ctx.fillText("600 Da", plotX + plotW, plotY + plotH + 5);
+
+                const sweepProgress = (frame % 120) / 120;
+                const sweepX = plotX + sweepProgress * plotW;
+
+                // Points plot
+                molecules.forEach(p => {
+                    const x = getX(p.mw);
+                    const y = getY(p.tox);
+                    
+                    let drawColor = 'rgba(138, 148, 158, 0.35)'; // Unscanned: Grey
+                    if (x < sweepX) {
+                        if (p.passes) {
+                            // If among top 5 after sweep thresholds, turn Green. Else, turn blue.
+                            const isTop5 = top5Ids.includes(p.seed);
+                            drawColor = (isTop5 && sweepProgress > 0.65) ? 'rgba(86, 211, 100, 0.95)' : 'rgba(88, 166, 255, 0.85)';
+                        } else {
+                            drawColor = 'rgba(255, 123, 114, 0.25)'; // Fail: Soft Red
+                        }
+                    }
+
+                    ctx.strokeStyle = drawColor;
+                    ctx.fillStyle = drawColor;
+                    ctx.lineWidth = 1.2;
+
+                    // 1. Calculate Cyclohexane Hexagon Vertices
+                    const hexRadius = 8;
+                    const vertices = [];
+                    const tilt = p.seed * 0.4; // Distinct rotational angles
+                    
+                    for (let i = 0; i < 6; i++) {
+                        const angle = tilt + (i * Math.PI / 3);
+                        vertices.push({
+                            x: x + Math.cos(angle) * hexRadius,
+                            y: y + Math.sin(angle) * hexRadius,
+                            angle: angle
+                        });
+                    }
+
+                    // Draw skeletal bonds
+                    ctx.beginPath();
+                    ctx.moveTo(vertices[0].x, vertices[0].y);
+                    for (let i = 1; i < 6; i++) {
+                        ctx.lineTo(vertices[i].x, vertices[i].y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // Draw carbon vertices
+                    vertices.forEach(v => {
+                        ctx.beginPath();
+                        ctx.arc(v.x, v.y, 1.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    // 2. Draw Stochastic Variations (Methyl Branches)
+                    const branchIdx = p.seed % 6;
+                    const vBranch = vertices[branchIdx];
+                    const branchLength = 6;
+                    const bx = vBranch.x + Math.cos(vBranch.angle) * branchLength;
+                    const by = vBranch.y + Math.sin(vBranch.angle) * branchLength;
+
+                    ctx.beginPath();
+                    ctx.moveTo(vBranch.x, vBranch.y);
+                    ctx.lineTo(bx, by);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 3. Double-branching (dimethyl) variation representation on select seeds
+                    if (p.seed % 3 === 0) {
+                        const secondBranchIdx = (branchIdx + 2) % 6;
+                        const vBranch2 = vertices[secondBranchIdx];
+                        const bx2 = vBranch2.x + Math.cos(vBranch2.angle) * branchLength;
+                        const by2 = vBranch2.y + Math.sin(vBranch2.angle) * branchLength;
+
+                        ctx.beginPath();
+                        ctx.moveTo(vBranch2.x, vBranch2.y);
+                        ctx.lineTo(bx2, by2);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(bx2, by2, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Draw localized tag label only for top 1 molecule after scan completes
+                    if (sweepProgress > 0.65 && p.seed === top5Ids[0]) {
+                        ctx.strokeStyle = '#56d364';
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 15, y - 15); ctx.stroke();
+                        ctx.fillStyle = '#56d364';
+                        ctx.font = 'bold 7px sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.fillText("Top Candidate", x + 18, y - 17);
+                    }
+                });
+
+                // Dashed limit line
+                const limitX = getX(500);
+                ctx.strokeStyle = 'rgba(255, 123, 114, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath(); ctx.moveTo(limitX, plotY); ctx.lineTo(limitX, plotY + plotH); ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Sweep scan bar
+                ctx.strokeStyle = '#bc8cff';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.moveTo(sweepX, plotY); ctx.lineTo(sweepX, plotY + plotH); ctx.stroke();
+
+                // Plot HUD Overlays
+                ctx.fillStyle = 'rgba(240, 246, 252, 0.85)';
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.fillText(`FORWARD PASS / RL OPTIMIZATION STAGE`, 15, 12);
+                let statusStr = "STATUS: SCORING PREDICTED ADMET";
+                let statusColor = "#bc8cff";
+                if (sweepProgress > 0.65) {
+                    statusStr = "STATUS: SAVING TOP 5 CANDIDATES";
+                    statusColor = "#56d364";
+                }
+                ctx.fillStyle = statusColor;
+                ctx.font = '8px monospace';
+                ctx.fillText(statusStr, 15, 23);
+                frame++;
+            }, 30);
+        }
+
+
+
+
+        // ==========================================
+        // LEAFLET MAP ENGINE INITIALIZATION
+        // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            const map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            });
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            // Dynamic map nodes color-coded and linked directly to left/right side drawers
+            const mapNodes = [
+                {
+                    name: "Harvard University",
+                    role: "M.S. in Data Science",
+                    coords: [42.3770, -71.1167],
+                    key: "harvard-edu",
+                    drawerType: "left",
+                    fillColor: '#A51C30',   // Harvard Crimson
+                    borderColor: '#ffffff'  // High-Contrast White Border
+                },
+                {
+                    name: "Massachusetts Institute of Technology (MIT)",
+                    role: "ML for Computational Biology (MLCB)",
+                    coords: [42.3601, -71.0942],
+                    key: "drug-discovery",
+                    drawerType: "right",    // Opens MLCB Project Brief
+                    fillColor: '#A31F34',   // MIT Red
+                    borderColor: '#C2C0C0'  // Silver Border
+                },
+                {
+                    name: "College of William & Mary",
+                    role: "B.S. in Biology",
+                    coords: [37.2724, -76.7118],
+                    key: "wm-edu",
+                    drawerType: "left",
+                    fillColor: '#115740',   // W&M Forest Green
+                    borderColor: '#F0B323'  // W&M Gold Border
+                },
+                {
+                    name: "James Monroe's Highland",
+                    role: "Invasive Species Predictive Modeling",
+                    coords: [37.9715, -78.4552],
+                    key: "highland-restoration",
+                    drawerType: "right",
+                    fillColor: '#115740',   // W&M Forest Green
+                    borderColor: '#F0B323'  // W&M Gold Border
+                },
+                {
+                    name: "Reston (Snakeden Branch)",
+                    role: "Invasive Plants GIS Mapping (Partnership with GMU)",
+                    coords: [38.9297, -77.3411], // Precise USGS Snakeden stream mouth at Lake Audubon
+                    key: "reston-gis",
+                    drawerType: "right",
+                    fillColor: '#115740',   // W&M Forest Green
+                    borderColor: '#F0B323'  // W&M Gold Border
+                },
+                {
+                    name: "DTRA Reston",
+                    role: "Operations Research Summer 2025",
+                    coords: [38.9586, -77.3579], // Reston Town Center Coordinates
+                    key: "dtra-analyst",
+                    drawerType: "right",
+                    fillColor: '#800080',   // SMART Purple
+                    borderColor: '#ffffff'  // High-Contrast White Border
+                },
+                {
+                    name: "DTRA (Fort Belvoir)",
+                    role: "SMART Scholarship for Service",
+                    coords: [38.7188, -77.1539],
+                    key: "dtra-analyst",
+                    drawerType: "right",     // Linked to Harvard education section
+                    fillColor: '#800080',   // Purple background
+                    borderColor: '#ffffff'  // White outline
+                }
+            ];
+
+            const markerGroup = L.featureGroup();
+            mapNodes.forEach(node => {
+                const marker = L.circleMarker(node.coords, {
+                    radius: 9, // Standardized node radius
+                    fillColor: node.fillColor,
+                    color: node.borderColor,
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.95
+                });
+
+                // Toggles drawers based on drawerType classification
+                marker.on('click', () => {
+                    if (node.drawerType === 'left') {
+                        showLeftDetails(node.key);
+                    } else if (node.drawerType === 'right') {
+                        showDetails(node.key);
+                    }
+                });
+
+                // Construct customized dark popup window markup
+                let popupContent = `
+                    <div style="font-size:12px; line-height: 1.4;">
+                        <h4 style="margin:0 0 2px 0; color:#f0f6fc; font-weight:bold;">${node.name}</h4>
+                        <div style="color:#c9d1d9; margin-bottom: 6px;">${node.role}</div>
+                `;
+
+                // if (node.drawerType === 'left') {
+                //     // popupContent += `
+                //     //     <a href="#" onclick="showLeftDetails('${node.key}'); return false;" style="color:#58a6ff; font-weight:bold; text-decoration:underline; font-size:11px; display:inline-block;">
+                //     //         Open Coursework & GPA →
+                //     //     </a>
+                //     // `;
+                // } else if (node.drawerType === 'right') {
+                //     popupContent += `
+                //         <a href="#" onclick="showDetails('${node.key}'); return false;" style="color:#58a6ff; font-weight:bold; text-decoration:underline; font-size:11px; display:inline-block;">
+                //         </a>
+                //     `;
+                // }
+                popupContent += `</div>`;
+                marker.bindPopup(popupContent);
+                markerGroup.addLayer(marker);
+            });
+
+            markerGroup.addTo(map);
+            map.fitBounds(markerGroup.getBounds(), { padding: [45, 45] });
+        });
+    </script>
+</body>
+</html>
