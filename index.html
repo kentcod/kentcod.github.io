@@ -236,9 +236,38 @@
             gap: 8px;
         }
                 /* Custom Dark Theme Filter for OpenStreetMap Tiles */
+                /* ==================================================== */
+        /* TECHNO / CYBERPUNK HUD MAP THEME                     */
+        /* ==================================================== */
+        
+        /* 1. Deep Obsidian & Electric Cyan Tile Filter */
         .leaflet-tile-pane {
-            filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+            filter: invert(100%) hue-rotate(180deg) sepia(80%) saturate(350%) hue-rotate(170deg) brightness(42%) contrast(145%);
         }
+
+        /* 2. Blend Map Container & Add Subtle Techno Vignette */
+        #map {
+            background-color: #090d12 !important;
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.85);
+        }
+
+        /* 3. Dark-Mode Techno Zoom Controls (+ / -) */
+        .leaflet-bar {
+            border: 1px solid var(--border-color) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6) !important;
+        }
+        .leaflet-bar a {
+            background-color: var(--bg-secondary) !important;
+            color: var(--accent-teal) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            transition: all 0.2s ease;
+        }
+        .leaflet-bar a:hover {
+            background-color: var(--bg-tertiary) !important;
+            color: var(--text-bright) !important;
+            box-shadow: inset 0 0 8px rgba(88, 166, 255, 0.3);
+        }
+        
 
     </style>
 </head>
