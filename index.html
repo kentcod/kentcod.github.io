@@ -235,6 +235,11 @@
             align-items: center;
             gap: 8px;
         }
+                /* Custom Dark Theme Filter for OpenStreetMap Tiles */
+        .leaflet-tile-pane {
+            filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+        }
+
     </style>
 </head>
 <body>
@@ -1707,7 +1712,8 @@ while maintaining high SQL accuracy, safety, and interpretability.
             });
             L.control.zoom({ position: 'topright' }).addTo(map);
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
     
             // Dynamic map nodes color-coded and linked directly to left/right side drawers
